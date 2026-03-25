@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Plus,
   Search,
@@ -15,7 +15,7 @@ import {
   Users,
   Filter,
 } from "lucide-react";
-import { getLeads, createLead, updateLead, createDeal } from "@/lib/store";
+import { useLeads, createDeal } from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
 import {
   Lead,
@@ -72,7 +72,7 @@ export default function LeadsPage() {
   const { user } = useAuth();
 
   // Data
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const { data: leads, createLead, updateLead } = useLeads();
 
   // Filters
   const [filterSource, setFilterSource] = useState("");
@@ -85,11 +85,6 @@ export default function LeadsPage() {
 
   // Feedback
   const [toast, setToast] = useState<string | null>(null);
-
-  // ------- load data on mount -------
-  useEffect(() => {
-    getLeads().then(setLeads).catch(() => {});
-  }, []);
 
   // ------- filtered leads -------
   const filtered = useMemo(() => {
@@ -130,12 +125,7 @@ export default function LeadsPage() {
 
   // ------- update score -------
   async function handleUpdateScore(id: string, score: LeadScore) {
-    const updated = await updateLead(id, { score });
-    if (updated) {
-      setLeads((prev) =>
-        prev.map((l) => (l.id === id ? updated : l))
-      );
-    }
+    await updateLead(id, { score });
   }
 
   // ------- convert to deal -------
@@ -153,19 +143,11 @@ export default function LeadsPage() {
       created_by: user?.id ?? null,
       property_type: "single_family",
     });
-
-    const updated = await updateLead(lead.id, {
+    await updateLead(lead.id, {
       deal_id: deal.id,
       converted_at: new Date().toISOString(),
       status: "converted" as LeadStatus,
     });
-
-    setLeads((prev) =>
-      prev.map((l) =>
-        l.id === lead.id ? (updated ?? l) : l
-      )
-    );
-
     showToast("Lead converted to deal successfully!");
   }
 
@@ -322,9 +304,9 @@ export default function LeadsPage() {
       {showAddModal && (
         <AddLeadModal
           userId={user?.id ?? null}
+          createLead={createLead}
           onClose={() => setShowAddModal(false)}
-          onCreated={(newLead) => {
-            setLeads((prev) => [newLead, ...prev]);
+          onCreated={() => {
             setShowAddModal(false);
             showToast("Lead added successfully!");
           }}
@@ -478,10 +460,12 @@ function AddLeadModal({
   userId,
   onClose,
   onCreated,
+  createLead,
 }: {
   userId: string | null;
   onClose: () => void;
-  onCreated: (lead: Lead) => void;
+  onCreated: () => void;
+  createLead: (data: Partial<Lead>) => Promise<Lead>;
 }) {
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -512,7 +496,7 @@ function AddLeadModal({
       return;
     }
 
-    const newLead = await createLead({
+    await createLead({
       address: form.address || null,
       city: form.city || null,
       state: form.state.trim(),
@@ -529,7 +513,7 @@ function AddLeadModal({
       assigned_to: userId,
     });
 
-    onCreated(newLead);
+    onCreated();
   }
 
   const inputCls =

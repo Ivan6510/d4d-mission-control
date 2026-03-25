@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { createDeal } from "@/lib/store";
+import { createDeal } from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/types";
 import {

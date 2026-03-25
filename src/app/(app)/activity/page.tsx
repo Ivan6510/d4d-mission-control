@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -25,17 +25,15 @@ import {
   X,
 } from "lucide-react";
 import {
+  useDeals,
+  useTasks,
+  createActivity,
+  createNote,
   getActivities,
   getActivityCount,
-  createActivity,
-  getTasks,
-  createTask,
-  updateTask,
-  getDeals,
-  createNote,
-} from "@/lib/store";
+} from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
-import type { ActivityLog, Task, Deal } from "@/lib/types";
+import type { ActivityLog, Task } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -138,16 +136,18 @@ export default function ActivityPage() {
   // Mobile tab state
   const [mobileTab, setMobileTab] = useState<"feed" | "tasks">("feed");
 
-  // Activity feed
+  // Activity feed (manual pagination)
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityOffset, setActivityOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Tasks
+  // Tasks from hook
+  const { data: hookTasks, loading: tasksLoading, createTask, updateTask } = useTasks();
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
+  useEffect(() => { setTasks(hookTasks); }, [hookTasks]);
+
   const [taskFilter, setTaskFilter] = useState<string>("all");
   const [showAddTask, setShowAddTask] = useState(false);
 
@@ -161,8 +161,11 @@ export default function ActivityPage() {
   });
   const [taskSubmitting, setTaskSubmitting] = useState(false);
 
+  // Deals from hook
+  const { data: allDeals } = useDeals();
+  const deals = useMemo(() => allDeals.map(d => ({ id: d.id, address: d.address, city: d.city, state: d.state })), [allDeals]);
+
   // Quick note
-  const [deals, setDeals] = useState<Pick<Deal, "id" | "address" | "city" | "state">[]>([]);
   const [noteContent, setNoteContent] = useState("");
   const [noteDealId, setNoteDealId] = useState("");
   const [noteSubmitting, setNoteSubmitting] = useState(false);
@@ -170,7 +173,7 @@ export default function ActivityPage() {
   // Error
   const [error] = useState<string | null>(null);
 
-  // ---- Data fetching ----
+  // ---- Activity fetching (manual for pagination) ----
 
   const fetchActivities = useCallback(async (offset: number, append: boolean) => {
     const rows = await getActivities(offset, PAGE_SIZE);
@@ -183,22 +186,10 @@ export default function ActivityPage() {
     setHasMore(offset + rows.length < total);
   }, []);
 
-  const fetchTasks = useCallback(async () => {
-    setTasks(await getTasks());
-  }, []);
-
-  const fetchDeals = useCallback(async () => {
-    const allDeals = await getDeals();
-    setDeals(allDeals.map((d) => ({ id: d.id, address: d.address, city: d.city, state: d.state })));
-  }, []);
-
   useEffect(() => {
     setActivityLoading(true);
-    setTasksLoading(true);
-    Promise.all([fetchActivities(0, false), fetchTasks(), fetchDeals()])
-      .catch(() => {})
-      .finally(() => { setActivityLoading(false); setTasksLoading(false); });
-  }, [fetchActivities, fetchTasks, fetchDeals]);
+    fetchActivities(0, false).catch(() => {}).finally(() => setActivityLoading(false));
+  }, [fetchActivities]);
 
   // Load more
   const loadMore = async () => {
@@ -246,7 +237,6 @@ export default function ActivityPage() {
       created_by: user?.id ?? null,
     });
 
-    setTasks((prev) => [...prev, created]);
     setNewTask({ title: "", description: "", assigned_to_name: "", due_date: "", deal_id: "" });
     setShowAddTask(false);
 

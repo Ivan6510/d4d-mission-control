@@ -17,7 +17,7 @@ import {
   AlertCircle,
   Home,
 } from "lucide-react";
-import { getDeals, createDeal, updateDeal, createActivity } from "@/lib/store";
+import { useDeals, createActivity } from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
 import type { Deal, DealStage } from "@/lib/types";
 import {
@@ -82,9 +82,14 @@ export default function DealsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const { data: fetchedDeals, loading, refetch: refetchDeals, createDeal, updateDeal } = useDeals();
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Sync from hook
+  useEffect(() => {
+    setDeals(fetchedDeals);
+  }, [fetchedDeals]);
   const [mounted, setMounted] = useState(false);
 
   // Modals
@@ -115,21 +120,6 @@ export default function DealsPage() {
       setAddModalOpen(true);
     }
   }, [searchParams]);
-
-  // -----------------------------------------------------------------------
-  // Fetch deals
-  // -----------------------------------------------------------------------
-  const fetchDeals = useCallback(async () => {
-    setError(null);
-    try {
-      setDeals(await getDeals());
-    } catch { /* keep empty */ }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchDeals();
-  }, [fetchDeals]);
 
   // -----------------------------------------------------------------------
   // Group deals by stage
@@ -195,7 +185,7 @@ export default function DealsPage() {
         }
       }
     },
-    [user]
+    [user, updateDeal]
   );
 
   // -----------------------------------------------------------------------
@@ -256,7 +246,7 @@ export default function DealsPage() {
       }
       setSaving(false);
     },
-    [form, expectedProfit, user, searchParams, router]
+    [form, expectedProfit, user, searchParams, router, createDeal]
   );
 
   // -----------------------------------------------------------------------
@@ -319,7 +309,7 @@ export default function DealsPage() {
 
       setSaving(false);
     },
-    [detailDeal]
+    [detailDeal, updateDeal]
   );
 
   // -----------------------------------------------------------------------
@@ -538,8 +528,7 @@ export default function DealsPage() {
           <button
             onClick={() => {
               setError(null);
-              setLoading(true);
-              fetchDeals();
+              refetchDeals();
             }}
             className="ml-auto text-xs text-red-400 underline hover:text-red-300"
           >

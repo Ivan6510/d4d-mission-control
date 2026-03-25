@@ -1,16 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
-import {
-  getDeals,
-  getRehabItems,
-  createRehabItem,
-  updateRehabItem,
-  getDraws,
-  createDraw,
-  updateDraw,
-} from "@/lib/store";
+import { useDeals, useRehabItems, useDraws } from "@/lib/useStore";
 import type { RehabItem, Draw, DrawStatus } from "@/lib/types";
 import { formatCurrency } from "@/lib/types";
 import {
@@ -77,8 +69,16 @@ const EMPTY_LINE_ITEM: NewLineItem = {
 export default function RehabPage() {
   useAuth();
 
-  const [deals, setDeals] = useState<import("@/lib/types").Deal[]>([]);
+  const { data: allDeals } = useDeals();
+  const deals = allDeals.filter((d) => ["in_rehab", "under_contract"].includes(d.stage));
+
   const [selectedDealId, setSelectedDealId] = useState<string>("");
+  useEffect(() => {
+    if (selectedDealId || deals.length === 0) return;
+    const rehabFirst = deals.find((d) => d.stage === "in_rehab");
+    setSelectedDealId(rehabFirst?.id ?? deals[0]?.id ?? "");
+  }, [deals, selectedDealId]);
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState<NewLineItem>(EMPTY_LINE_ITEM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -87,32 +87,9 @@ export default function RehabPage() {
     status: "",
   });
   const [progressNotes, setProgressNotes] = useState("");
-  const [rehabItems, setRehabItems] = useState<RehabItem[]>([]);
-  const [draws, setDraws] = useState<Draw[]>([]);
 
-  // Load deals
-  useEffect(() => {
-    getDeals().then((all) => {
-      const filtered = all.filter((d) => ["in_rehab", "under_contract"].includes(d.stage));
-      setDeals(filtered);
-      const rehabFirst = filtered.find((d) => d.stage === "in_rehab");
-      const defaultId = rehabFirst?.id ?? filtered[0]?.id ?? "";
-      setSelectedDealId(defaultId);
-    }).catch(() => {});
-  }, []);
-
-  // Load rehab items and draws when deal changes
-  useEffect(() => {
-    if (!selectedDealId) { setRehabItems([]); setDraws([]); return; }
-    getRehabItems(selectedDealId).then(setRehabItems).catch(() => setRehabItems([]));
-    getDraws(selectedDealId).then(setDraws).catch(() => setDraws([]));
-  }, [selectedDealId]);
-
-  const refresh = useCallback(() => {
-    if (!selectedDealId) return;
-    getRehabItems(selectedDealId).then(setRehabItems).catch(() => {});
-    getDraws(selectedDealId).then(setDraws).catch(() => {});
-  }, [selectedDealId]);
+  const { data: rehabItems, createRehabItem, updateRehabItem } = useRehabItems(selectedDealId || null);
+  const { data: draws, createDraw, updateDraw } = useDraws(selectedDealId || null);
 
   const selectedDeal = deals.find((d) => d.id === selectedDealId) ?? null;
 
@@ -130,7 +107,6 @@ export default function RehabPage() {
     });
     setNewItem(EMPTY_LINE_ITEM);
     setShowAddForm(false);
-    refresh();
   }
 
   // Inline edit save
@@ -140,7 +116,6 @@ export default function RehabPage() {
       status: editValues.status as RehabItem["status"],
     });
     setEditingItemId(null);
-    refresh();
   }
 
   // Update draw status
@@ -150,7 +125,6 @@ export default function RehabPage() {
     if (newStatus === "approved") updates.approved_at = new Date().toISOString();
     if (newStatus === "paid") updates.paid_at = new Date().toISOString();
     await updateDraw(drawId, updates as Partial<Draw>);
-    refresh();
   }
 
   // Initialize draws if none exist for selected deal
@@ -166,7 +140,6 @@ export default function RehabPage() {
         description: DRAW_LABELS[n].title,
       });
     }
-    refresh();
   }
 
   // Budget calculations

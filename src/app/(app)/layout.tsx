@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { seedIfNeeded } from "@/lib/store";
+import { seedIfNeeded } from "@/lib/useStore";
 import Sidebar from "@/components/Sidebar";
 
 function AppShell({ children }: { children: React.ReactNode }) {

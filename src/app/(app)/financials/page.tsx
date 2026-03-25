@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -14,7 +14,7 @@ import {
   Building2,
   UserCheck,
 } from "lucide-react";
-import { getDeals } from "@/lib/store";
+import { useDeals } from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency } from "@/lib/types";
 
@@ -31,8 +31,7 @@ interface CashFlowEntry {
 export default function FinancialsPage() {
   useAuth();
 
-  const [allDeals, setAllDeals] = useState<import("@/lib/types").Deal[]>([]);
-  useEffect(() => { getDeals().then(setAllDeals).catch(() => {}); }, []);
+  const { data: allDeals } = useDeals();
   const deals = useMemo(() => allDeals.filter((d) => d.stage === "sold"), [allDeals]);
 
   const [period, setPeriod] = useState<Period>("monthly");

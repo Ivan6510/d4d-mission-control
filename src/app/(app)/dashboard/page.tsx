@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -12,10 +11,9 @@ import {
   ChevronRight,
   LayoutDashboard,
 } from "lucide-react";
-import { getDeals } from "@/lib/store";
+import { useDeals } from "@/lib/useStore";
 import { useAuth } from "@/lib/auth";
 import {
-  Deal,
   DEAL_STAGES,
   formatCurrency,
   daysInStage,
@@ -47,12 +45,7 @@ const STAGE_TEXT_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getDeals().then((d) => { setDeals(d); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
+  const { data: deals, loading } = useDeals();
 
   // Computed stats
   const activeDeals = deals.filter(
