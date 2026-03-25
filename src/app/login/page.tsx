@@ -11,13 +11,18 @@ export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (login(name, code)) {
-      router.push("/dashboard");
-    } else {
-      setError("Invalid name or code");
+    try {
+      const ok = await login(name, code);
+      if (ok) {
+        router.push("/dashboard");
+      } else {
+        setError("Invalid name or code");
+      }
+    } catch {
+      setError("Login failed — please try again");
     }
   };
 

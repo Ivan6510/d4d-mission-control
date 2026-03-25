@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
 import {
   getDeals,
@@ -77,14 +77,8 @@ const EMPTY_LINE_ITEM: NewLineItem = {
 export default function RehabPage() {
   useAuth();
 
-  // Load deals synchronously from localStorage, filtered to rehab-relevant stages
-  const allDeals = getDeals().filter((d) =>
-    ["in_rehab", "under_contract"].includes(d.stage)
-  );
-  const rehabFirst = allDeals.find((d) => d.stage === "in_rehab");
-  const defaultDealId = rehabFirst?.id ?? allDeals[0]?.id ?? "";
-
-  const [selectedDealId, setSelectedDealId] = useState<string>(defaultDealId);
+  const [deals, setDeals] = useState<import("@/lib/types").Deal[]>([]);
+  const [selectedDealId, setSelectedDealId] = useState<string>("");
   const [showAddForm, setShowAddForm] = useState(false);
   const [newItem, setNewItem] = useState<NewLineItem>(EMPTY_LINE_ITEM);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -93,19 +87,39 @@ export default function RehabPage() {
     status: "",
   });
   const [progressNotes, setProgressNotes] = useState("");
-  // Counter to force re-render after mutations
-  const [, setTick] = useState(0);
-  const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const [rehabItems, setRehabItems] = useState<RehabItem[]>([]);
+  const [draws, setDraws] = useState<Draw[]>([]);
 
-  const deals = allDeals;
+  // Load deals
+  useEffect(() => {
+    getDeals().then((all) => {
+      const filtered = all.filter((d) => ["in_rehab", "under_contract"].includes(d.stage));
+      setDeals(filtered);
+      const rehabFirst = filtered.find((d) => d.stage === "in_rehab");
+      const defaultId = rehabFirst?.id ?? filtered[0]?.id ?? "";
+      setSelectedDealId(defaultId);
+    }).catch(() => {});
+  }, []);
+
+  // Load rehab items and draws when deal changes
+  useEffect(() => {
+    if (!selectedDealId) { setRehabItems([]); setDraws([]); return; }
+    getRehabItems(selectedDealId).then(setRehabItems).catch(() => setRehabItems([]));
+    getDraws(selectedDealId).then(setDraws).catch(() => setDraws([]));
+  }, [selectedDealId]);
+
+  const refresh = useCallback(() => {
+    if (!selectedDealId) return;
+    getRehabItems(selectedDealId).then(setRehabItems).catch(() => {});
+    getDraws(selectedDealId).then(setDraws).catch(() => {});
+  }, [selectedDealId]);
+
   const selectedDeal = deals.find((d) => d.id === selectedDealId) ?? null;
-  const rehabItems = selectedDealId ? getRehabItems(selectedDealId) : [];
-  const draws = selectedDealId ? getDraws(selectedDealId) : [];
 
   // Add new line item
-  function handleAddItem() {
+  async function handleAddItem() {
     if (!selectedDealId || !newItem.description.trim()) return;
-    createRehabItem({
+    await createRehabItem({
       deal_id: selectedDealId,
       category: newItem.category,
       description: newItem.description.trim(),
@@ -120,8 +134,8 @@ export default function RehabPage() {
   }
 
   // Inline edit save
-  function handleSaveEdit(itemId: string) {
-    updateRehabItem(itemId, {
+  async function handleSaveEdit(itemId: string) {
+    await updateRehabItem(itemId, {
       actual_cost: parseFloat(editValues.actual_cost) || 0,
       status: editValues.status as RehabItem["status"],
     });
@@ -130,28 +144,28 @@ export default function RehabPage() {
   }
 
   // Update draw status
-  function handleDrawStatusChange(drawId: string, newStatus: DrawStatus) {
+  async function handleDrawStatusChange(drawId: string, newStatus: DrawStatus) {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "requested") updates.requested_at = new Date().toISOString();
     if (newStatus === "approved") updates.approved_at = new Date().toISOString();
     if (newStatus === "paid") updates.paid_at = new Date().toISOString();
-    updateDraw(drawId, updates as Partial<Draw>);
+    await updateDraw(drawId, updates as Partial<Draw>);
     refresh();
   }
 
   // Initialize draws if none exist for selected deal
-  function initializeDraws() {
+  async function initializeDraws() {
     if (!selectedDeal || !selectedDeal.rehab_budget) return;
     const drawAmount = Math.round(selectedDeal.rehab_budget / 3);
-    [1, 2, 3].forEach((n) => {
-      createDraw({
+    for (const n of [1, 2, 3]) {
+      await createDraw({
         deal_id: selectedDeal.id,
         draw_number: n,
         amount: n === 3 ? selectedDeal.rehab_budget! - drawAmount * 2 : drawAmount,
         status: "pending" as DrawStatus,
         description: DRAW_LABELS[n].title,
       });
-    });
+    }
     refresh();
   }
 

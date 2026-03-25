@@ -172,58 +172,53 @@ export default function ActivityPage() {
 
   // ---- Data fetching ----
 
-  const fetchActivities = useCallback((offset: number, append: boolean) => {
-    const rows = getActivities(offset, PAGE_SIZE);
+  const fetchActivities = useCallback(async (offset: number, append: boolean) => {
+    const rows = await getActivities(offset, PAGE_SIZE);
     if (append) {
       setActivities((prev) => [...prev, ...rows]);
     } else {
       setActivities(rows);
     }
-    const total = getActivityCount();
+    const total = await getActivityCount();
     setHasMore(offset + rows.length < total);
   }, []);
 
-  const fetchTasks = useCallback(() => {
-    setTasks(getTasks());
+  const fetchTasks = useCallback(async () => {
+    setTasks(await getTasks());
   }, []);
 
-  const fetchDeals = useCallback(() => {
-    const allDeals = getDeals();
+  const fetchDeals = useCallback(async () => {
+    const allDeals = await getDeals();
     setDeals(allDeals.map((d) => ({ id: d.id, address: d.address, city: d.city, state: d.state })));
   }, []);
 
   useEffect(() => {
     setActivityLoading(true);
     setTasksLoading(true);
-    fetchActivities(0, false);
-    fetchTasks();
-    fetchDeals();
-    setActivityLoading(false);
-    setTasksLoading(false);
+    Promise.all([fetchActivities(0, false), fetchTasks(), fetchDeals()])
+      .catch(() => {})
+      .finally(() => { setActivityLoading(false); setTasksLoading(false); });
   }, [fetchActivities, fetchTasks, fetchDeals]);
 
   // Load more
-  const loadMore = () => {
+  const loadMore = async () => {
     const nextOffset = activityOffset + PAGE_SIZE;
     setLoadingMore(true);
-    fetchActivities(nextOffset, true);
+    await fetchActivities(nextOffset, true);
     setActivityOffset(nextOffset);
     setLoadingMore(false);
   };
 
   // ---- Task actions ----
 
-  const toggleTaskStatus = (task: Task) => {
+  const toggleTaskStatus = async (task: Task) => {
     const nextStatus: Record<string, string> = {
       pending: "in_progress",
       in_progress: "completed",
       completed: "pending",
     };
     const newStatus = nextStatus[task.status] as Task["status"];
-    updateTask(task.id, {
-      status: newStatus,
-      completed_at: newStatus === "completed" ? new Date().toISOString() : null,
-    });
+    // Optimistic update
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id
@@ -231,13 +226,17 @@ export default function ActivityPage() {
           : t
       )
     );
+    await updateTask(task.id, {
+      status: newStatus,
+      completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+    });
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!newTask.title.trim()) return;
     setTaskSubmitting(true);
 
-    const created = createTask({
+    const created = await createTask({
       title: newTask.title.trim(),
       description: newTask.description.trim() || null,
       assigned_to_name: newTask.assigned_to_name || null,
@@ -252,7 +251,7 @@ export default function ActivityPage() {
     setShowAddTask(false);
 
     // Log activity
-    createActivity({
+    await createActivity({
       user_id: user?.id ?? null,
       user_name: user?.name ?? "System",
       action: "created task",
@@ -266,11 +265,11 @@ export default function ActivityPage() {
 
   // ---- Quick note ----
 
-  const postNote = () => {
+  const postNote = async () => {
     if (!noteContent.trim() || !noteDealId) return;
     setNoteSubmitting(true);
 
-    createNote({
+    await createNote({
       deal_id: noteDealId,
       user_id: user?.id ?? null,
       user_name: user?.name ?? "Unknown",
@@ -279,7 +278,7 @@ export default function ActivityPage() {
 
     // Log activity
     const deal = deals.find((d) => d.id === noteDealId);
-    createActivity({
+    await createActivity({
       user_id: user?.id ?? null,
       user_name: user?.name ?? "Unknown",
       action: "added a note",
@@ -292,7 +291,7 @@ export default function ActivityPage() {
     setNoteDealId("");
 
     // Refresh feed
-    fetchActivities(0, false);
+    await fetchActivities(0, false);
     setActivityOffset(0);
 
     setNoteSubmitting(false);

@@ -12,7 +12,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    seedIfNeeded();
+    seedIfNeeded().catch(() => {});
     setMounted(true);
   }, []);
 

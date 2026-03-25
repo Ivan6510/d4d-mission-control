@@ -51,8 +51,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setDeals(getDeals());
-    setLoading(false);
+    getDeals().then((d) => { setDeals(d); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
   // Computed stats

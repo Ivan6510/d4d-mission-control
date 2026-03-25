@@ -107,12 +107,12 @@ export default function CalculatorPage() {
     };
   }, [hasInput, analysis.netProfit]);
 
-  function handleSave() {
+  async function handleSave() {
     if (!hasInput) return;
     setSaving(true);
     setSaveMessage(null);
 
-    createDeal({
+    await createDeal({
       address: address || "TBD",
       city: "",
       state: "",

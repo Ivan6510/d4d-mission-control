@@ -86,9 +86,9 @@ export default function LeadsPage() {
   // Feedback
   const [toast, setToast] = useState<string | null>(null);
 
-  // ------- load from localStorage on mount -------
+  // ------- load data on mount -------
   useEffect(() => {
-    setLeads(getLeads());
+    getLeads().then(setLeads).catch(() => {});
   }, []);
 
   // ------- filtered leads -------
@@ -129,8 +129,8 @@ export default function LeadsPage() {
   }, [leads]);
 
   // ------- update score -------
-  function handleUpdateScore(id: string, score: LeadScore) {
-    const updated = updateLead(id, { score });
+  async function handleUpdateScore(id: string, score: LeadScore) {
+    const updated = await updateLead(id, { score });
     if (updated) {
       setLeads((prev) =>
         prev.map((l) => (l.id === id ? updated : l))
@@ -139,8 +139,8 @@ export default function LeadsPage() {
   }
 
   // ------- convert to deal -------
-  function handleConvertToDeal(lead: Lead) {
-    const deal = createDeal({
+  async function handleConvertToDeal(lead: Lead) {
+    const deal = await createDeal({
       address: lead.address ?? "Unknown Address",
       city: lead.city ?? "",
       state: lead.state,
@@ -154,7 +154,7 @@ export default function LeadsPage() {
       property_type: "single_family",
     });
 
-    const updated = updateLead(lead.id, {
+    const updated = await updateLead(lead.id, {
       deal_id: deal.id,
       converted_at: new Date().toISOString(),
       status: "converted" as LeadStatus,
@@ -503,7 +503,7 @@ function AddLeadModal({
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
 
@@ -512,7 +512,7 @@ function AddLeadModal({
       return;
     }
 
-    const newLead = createLead({
+    const newLead = await createLead({
       address: form.address || null,
       city: form.city || null,
       state: form.state.trim(),

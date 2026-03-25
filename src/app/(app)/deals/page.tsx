@@ -119,9 +119,11 @@ export default function DealsPage() {
   // -----------------------------------------------------------------------
   // Fetch deals
   // -----------------------------------------------------------------------
-  const fetchDeals = useCallback(() => {
+  const fetchDeals = useCallback(async () => {
     setError(null);
-    setDeals(getDeals());
+    try {
+      setDeals(await getDeals());
+    } catch { /* keep empty */ }
     setLoading(false);
   }, []);
 
@@ -154,7 +156,7 @@ export default function DealsPage() {
   // Drag & drop handler
   // -----------------------------------------------------------------------
   const handleDragEnd = useCallback(
-    (result: DropResult) => {
+    async (result: DropResult) => {
       const { destination, source, draggableId } = result;
       if (!destination) return;
       if (
@@ -166,7 +168,12 @@ export default function DealsPage() {
       const newStage = destination.droppableId as DealStage;
       const dealId = draggableId;
 
-      const updated = updateDeal(dealId, {
+      // Optimistic update
+      setDeals((prev) =>
+        prev.map((d) => (d.id === dealId ? { ...d, stage: newStage, stage_changed_at: new Date().toISOString() } : d))
+      );
+
+      const updated = await updateDeal(dealId, {
         stage: newStage,
         stage_changed_at: new Date().toISOString(),
       });
@@ -205,14 +212,14 @@ export default function DealsPage() {
   const expectedProfit = calcExpectedProfit();
 
   const handleAddDeal = useCallback(
-    (e: React.FormEvent) => {
+    async (e: React.FormEvent) => {
       e.preventDefault();
       if (!form.address.trim() || !form.city.trim() || !form.state.trim()) return;
 
       setSaving(true);
 
       const now = new Date().toISOString();
-      const newDeal = createDeal({
+      const newDeal = await createDeal({
         address: form.address.trim(),
         city: form.city.trim(),
         state: form.state.trim().toUpperCase(),
@@ -277,7 +284,7 @@ export default function DealsPage() {
   );
 
   const saveField = useCallback(
-    (field: string, value: string) => {
+    async (field: string, value: string) => {
       if (!detailDeal) return;
       setSaving(true);
 
@@ -302,7 +309,7 @@ export default function DealsPage() {
           : null
         : value || null;
 
-      const updated = updateDeal(detailDeal.id, { [field]: parsed });
+      const updated = await updateDeal(detailDeal.id, { [field]: parsed });
 
       if (updated) {
         setDetailDeal(updated);

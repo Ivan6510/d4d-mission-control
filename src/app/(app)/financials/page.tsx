@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -31,10 +31,9 @@ interface CashFlowEntry {
 export default function FinancialsPage() {
   useAuth();
 
-  const deals = useMemo(
-    () => getDeals().filter((d) => d.stage === "sold"),
-    []
-  );
+  const [allDeals, setAllDeals] = useState<import("@/lib/types").Deal[]>([]);
+  useEffect(() => { getDeals().then(setAllDeals).catch(() => {}); }, []);
+  const deals = useMemo(() => allDeals.filter((d) => d.stage === "sold"), [allDeals]);
 
   const [period, setPeriod] = useState<Period>("monthly");
   const [year, setYear] = useState(new Date().getFullYear());
